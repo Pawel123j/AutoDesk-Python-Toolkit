@@ -1,0 +1,9 @@
+Order ID, Customer Name,Product Category,Revenue,Units,Order Date,Region
+1001,Ada Lovelace,Software,1299.00,3,2026-01-03,North
+1002,Grace Hopper,Hardware,899.50,1,2026-01-04,West
+1003,Alan Turing,Services,,2,2026-01-06,East
+1004,Katherine Johnson,Software,149.99,4,2026-01-08,South
+1004,Katherine Johnson,Software,149.99,4,2026-01-08,South
+,,,,,,
+1005,Donald Knuth,Books,79.99,5,2026-01-12,North
+1006,Radia Perlman,Hardware,459.00,2,2026-01-14,West
