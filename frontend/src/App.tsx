@@ -96,6 +96,15 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // Wczytanie historii przy montowaniu komponentu.
+    //
+    // Reguła `set-state-in-effect` ostrzega przed synchronicznym
+    // ustawianiem stanu w ciele efektu, bo powoduje to kaskadę
+    // renderowań. Tutaj tak nie jest: `refreshHistory` nie dotyka stanu
+    // przed `await getHistory()`, więc wszystkie `setState` dzieją się
+    // po odpowiedzi z sieci, w osobnej turze. Reguła widzi jednak tylko
+    // wywołanie funkcji i zgłasza je zachowawczo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshHistory();
   }, [refreshHistory]);
 
