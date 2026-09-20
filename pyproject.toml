@@ -1,0 +1,32 @@
+[tool.ruff]
+# Zestaw reguł przypięty jawnie: domyślny zbiór ruffa zmienia się między
+# wydaniami, więc bez tego CI potrafi zapalić się na czerwono po aktualizacji
+# narzędzia, przy niezmienionym kodzie.
+target-version = "py311"
+line-length = 110
+exclude = ["frontend", "backend/generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+  # `except Exception` przy parsowaniu CSV jest decyzją projektową: pandas
+  # rzuca kilkanaście różnych wyjątków dla uszkodzonego pliku, a użytkownik
+  # ma dostać jeden czytelny komunikat zamiast pięciusetki.
+  "BLE001",
+  # `Depends(...)` i `File(...)` w wartościach domyślnych argumentów to
+  # sposób, w jaki działa FastAPI — nie pomyłka. Reguła B008 ostrzega
+  # przed wywołaniem funkcji w domyślnym argumencie, co w zwykłym Pythonie
+  # jest pułapką, ale tutaj jest wymaganym API frameworka.
+  "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/*" = ["E501"]
+
+[tool.pytest.ini_options]
+# `pythonpath` sprawia, że `pytest` i `python -m pytest` zachowują się
+# tak samo — bez tego `from app.services import ...` działa tylko przy
+# drugim wywołaniu.
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
+addopts = "-q"
