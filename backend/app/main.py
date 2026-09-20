@@ -45,9 +45,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in os.getenv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS).split(",") if origin.strip()],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,7 +62,9 @@ app.add_middleware(
 
 @app.get("/", response_model=MessageResponse, tags=["System"])
 def root() -> MessageResponse:
-    return MessageResponse(message="AutoDesk Python Toolkit API is running. Open /docs for interactive API docs.")
+    return MessageResponse(
+        message="AutoDesk Python Toolkit API is running. Open /docs for interactive API docs."
+    )
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["System"])
@@ -103,7 +111,7 @@ async def csv_to_excel_endpoint(file: UploadFile = File(...)) -> FileResponse:
     add_history(
         action_type="CSV to Excel",
         file_name=file_name,
-        details={"download_name": download_name, "rows": int(len(dataframe)), "columns": int(len(dataframe.columns))},
+        details={"download_name": download_name, "rows": len(dataframe), "columns": len(dataframe.columns)},
     )
     return FileResponse(
         path=output_path,
@@ -130,7 +138,7 @@ async def report_generator_endpoint(
     add_history(
         action_type="Report Generator",
         file_name=file_name,
-        details={"download_name": download_name, "format": report_format, "rows": int(len(dataframe))},
+        details={"download_name": download_name, "format": report_format, "rows": len(dataframe)},
     )
     media_type = "text/html" if report_format == "html" else "text/plain"
     return FileResponse(path=output_path, filename=download_name, media_type=media_type)

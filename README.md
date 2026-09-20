@@ -4,6 +4,11 @@ AutoDesk Python Toolkit is a local full-stack automation dashboard for beginner 
 
 No paid APIs are required. Everything runs locally.
 
+> **Uwaga co do nazwy.** Ten projekt nie ma żadnego związku z firmą
+> **Autodesk, Inc.** (AutoCAD, Maya, Fusion 360). Zbieżność nazw jest
+> przypadkowa i **nazwa powinna zostać zmieniona** — propozycje
+> i uzasadnienie: [docs/NAZWA.md](docs/NAZWA.md).
+
 ## Features
 
 - Homepage with a polished dashboard overview
@@ -58,6 +63,67 @@ AutoDesk-Python-Toolkit/
   README.md
   .gitignore
 ```
+
+## Uruchomienie przez Dockera
+
+Najszybsza droga — jedna komenda stawia backend i frontend:
+
+```bash
+docker compose up --build
+```
+
+- Frontend: http://localhost:5173
+- API i dokumentacja: http://localhost:8000/docs
+
+Obraz backendu działa **bez roota** i ma healthcheck; frontend jest
+budowany w osobnym etapie, więc do obrazu wynikowego nie trafia ani
+`node_modules`, ani kod źródłowy — sam katalog `dist` serwowany przez nginx.
+
+Adres backendu wchodzi do bundla frontendu **w czasie budowania** (Vite
+podmienia `import.meta.env.*` na stałe), więc zmiana `VITE_API_BASE_URL`
+wymaga przebudowania obrazu, nie tylko restartu.
+
+## Testy, lint i CI
+
+```bash
+# backend
+pip install -r requirements.txt pytest ruff
+ruff check .
+pytest                    # 46 testów
+
+# frontend
+cd frontend && npm ci
+npm run lint              # ESLint
+npm run typecheck         # tsc --noEmit
+npm run build
+```
+
+CI uruchamia to wszystko na każdej gałęzi, plus buduje oba obrazy Dockera
+**i sprawdza, że backend odpowiada** — obraz, którego nikt nie uruchomił,
+nie jest dowodem na nic.
+
+Wcześniej jedynym sprawdzeniem backendu było `python -m compileall`.
+Sprawdzanie, czy kod daje się sparsować, nie mówi nic o tym, czy robi to,
+co powinien — a to jest aplikacja do przetwarzania danych, w której błąd
+niczego nie wywala, tylko zwraca złe liczby.
+
+### Co pokrywają testy
+
+Testy dotyczą warstwy przetwarzania danych, bo tam błąd jest najdroższy
+i najtrudniejszy do zauważenia:
+
+| Obszar | Przykład tego, co jest sprawdzane |
+|---|---|
+| Normalizacja nazw kolumn | wynik **zawsze unikalny** — dwie kolumny o tej samej nazwie sprawiają, że przy zamianie wiersza na słownik jedna po cichu przesłania drugą |
+| Czyszczenie CSV | usuwany jest wiersz *całkowicie* pusty, nie taki z jedną brakującą wartością; liczby się bilansują; ramka wejściowa nie jest modyfikowana |
+| Podgląd | `NaN` zamieniany na `null` (inaczej frontend nie sparsuje odpowiedzi), wartości jako typy Pythona a nie numpy |
+| Raporty | nazwa pliku i nazwy kolumn **escapowane** w HTML — oba pochodzą od użytkownika |
+| Nazwy plików | `../../etc/passwd` sprowadzane do `passwd`; losowy przyrostek, żeby drugi użytkownik nie nadpisał pliku pierwszego |
+
+Podczas pisania tych testów wyszedł **realny błąd** w normalizacji nazw
+kolumn: dla `["Name", "name_2", "NAME"]` powstawały dwie kolumny `name_2`.
+Licznik wystąpień nazwy bazowej nie sprawdzał, czy wygenerowany przyrostek
+nie koliduje z nazwą, która wystąpiła w pliku dosłownie. Naprawione.
 
 ## Backend Setup
 
@@ -140,3 +206,7 @@ VITE_API_BASE_URL=http://localhost:8000
 - Add unit tests for CSV processing and sorter categorization
 - Add Docker Compose for one-command startup
 - Add richer report templates and chart exports
+
+## Licencja
+
+MIT — patrz [LICENSE](LICENSE).

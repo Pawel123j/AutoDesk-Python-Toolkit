@@ -1,35 +1,21 @@
 # Python
 __pycache__/
 *.py[cod]
+.venv/
+venv/
 .pytest_cache/
 .ruff_cache/
-.mypy_cache/
-.venv/
-.python-packages/
-venv/
-env/
 
-# Backend runtime data
-backend/data/*.db
+# Dane generowane przez aplikację
 backend/generated/*
 !backend/generated/.gitkeep
-uploads/
+*.db
+*.sqlite3
 
-# Frontend
+# Node
 node_modules/
-dist/
-*.tsbuildinfo
-frontend/vite.config.js
-frontend/vite.config.d.ts
+frontend/dist/
 
-# OS/editor
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-
-# Logs and local env
-*.log
-*.err.log
+# Środowisko
 .env
-.env.*
+.env*.local

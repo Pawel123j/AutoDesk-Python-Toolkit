@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -42,7 +43,7 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
 def add_history(action_type: str, file_name: str, details: dict[str, Any] | None = None) -> None:
     payload = json.dumps(details or {}, ensure_ascii=True)
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now(UTC).isoformat()
     with get_connection() as connection:
         connection.execute(
             """

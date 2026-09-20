@@ -66,16 +66,36 @@ def clean_csv(dataframe: pd.DataFrame) -> dict[str, Any]:
 
 
 def normalize_column_names(columns: pd.Index) -> list[str]:
+    """Sprowadza nazwy kolumn do postaci `snake_case` i gwarantuje ich unikalność.
+
+    Unikalność jest tu wymogiem, a nie ozdobnikiem: dwie kolumny o tej samej
+    nazwie sprawiają, że przy zamianie wiersza na słownik (podgląd, eksport)
+    jedna po cichu przesłania drugą — dane znikają bez żadnego komunikatu.
+
+    Sam licznik wystąpień nazwy bazowej nie wystarcza. Dla kolumn
+    ``["Name", "name_2", "NAME"]`` daje on kolejno ``name``, ``name_2``
+    (dosłownie z pliku) i znowu ``name_2`` (jako drugie wystąpienie ``name``)
+    — czyli dokładnie tę kolizję, której miał zapobiegać. Dlatego kandydat
+    jest dodatkowo sprawdzany względem nazw już przydzielonych.
+    """
     normalized: list[str] = []
+    used: set[str] = set()
     seen: dict[str, int] = {}
 
     for column in columns:
-        value = str(column).strip().lower()
-        value = re.sub(r"[^a-z0-9]+", "_", value)
-        value = value.strip("_") or "column"
+        base = str(column).strip().lower()
+        base = re.sub(r"[^a-z0-9]+", "_", base)
+        base = base.strip("_") or "column"
 
-        seen[value] = seen.get(value, 0) + 1
-        normalized.append(value if seen[value] == 1 else f"{value}_{seen[value]}")
+        seen[base] = seen.get(base, 0) + 1
+        candidate = base if seen[base] == 1 else f"{base}_{seen[base]}"
+
+        while candidate in used:
+            seen[base] += 1
+            candidate = f"{base}_{seen[base]}"
+
+        used.add(candidate)
+        normalized.append(candidate)
 
     return normalized
 
@@ -116,8 +136,8 @@ def calculate_report_stats(dataframe: pd.DataFrame) -> dict[str, Any]:
     }
 
     return {
-        "row_count": int(len(dataframe)),
-        "column_count": int(len(dataframe.columns)),
+        "row_count": len(dataframe),
+        "column_count": len(dataframe.columns),
         "missing_values": {column: int(dataframe[column].isna().sum()) for column in dataframe.columns},
         "numeric_averages": averages,
     }
