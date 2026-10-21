@@ -7,8 +7,6 @@ wyglądają poprawnie, a nie są. Tego rodzaju błąd wychodzi najpóźniej.
 """
 from __future__ import annotations
 
-import math
-
 import pandas as pd
 import pytest
 from app.services import (
@@ -157,11 +155,9 @@ class TestToJsonSafe:
         assert to_json_safe("tekst") == "tekst"
         assert to_json_safe(True) is True
 
-    def test_nieskonczonosc_przechodzi_bez_zmian(self):
-        # Udokumentowanie stanu faktycznego: inf NIE jest zamieniany na None,
-        # w odróżnieniu od NaN. Gdyby kiedyś trafił do danych, JSON go nie
-        # zniesie — ten test pokaże, gdzie szukać.
-        assert math.isinf(to_json_safe(float("inf")))
+    @pytest.mark.parametrize("value", [float("inf"), float("-inf")])
+    def test_nieskonczonosc_staje_sie_none(self, value):
+        assert to_json_safe(value) is None
 
 
 # ── statystyki i raporty ────────────────────────────────────────────────

@@ -210,3 +210,36 @@ VITE_API_BASE_URL=http://localhost:8000
 ## Licencja
 
 MIT — patrz [LICENSE](LICENSE).
+
+## Weryfikacja środowiska — 2026-10-17
+
+Backend zalicza 50 testów; Ruff oraz lint, typy i build frontendu przechodzą. Naprawiono serializację `inf`/`-inf` w podglądzie CSV (JSON `null`), ograniczono odczyt uploadu i usunięto szczegóły wyjątków z odpowiedzi błędów konwersji/raportu.
+
+`AUTODESK_DATA_DIR` wybiera katalog SQLite (`toolkit.db`), a `AUTODESK_GENERATED_DIR` katalog eksportów; domyślne ścieżki pozostają w `backend/`. Ustaw je przed startem procesu. E2E tworzy własne katalogi i sprawdza rzeczywisty upload, deduplikację oraz historię po reload. Zbuduj frontend z `VITE_API_BASE_URL=http://127.0.0.1:18320`; opcjonalnie ustaw `E2E_API_PYTHON` na interpreter backendu. CI: `.github/workflows/browser.yml`.
+
+API nie ma kontroli dostępu: lokalne narzędzie jest gotowe do demonstracji, publiczny serwer wymaga uwierzytelnienia, limitu wielkości żądań na proxy i polityki usuwania eksportów. Audyt npm pozostawia zgłoszenia narzędziowe Tailwind. Przy aktualizacji zachowaj katalog danych i eksportów; rollback przywraca kod oraz backup SQLite z kompatybilnym schematem.
+
+
+### Testy przeglądarkowe
+
+Po zainstalowaniu zależności aplikacji i zbudowaniu frontendu zgodnie z README / workflow `browser.yml` (lub jobem browser w `ci.yml`):
+
+```bash
+python -m venv .venv-e2e
+# Aktywuj ten venv przed dalszymi poleceniami.
+python -m pip install -r e2e/requirements.txt
+python -m playwright install chromium
+python -m pytest -q e2e
+```
+
+Na Linux może być potrzebne `python -m playwright install --with-deps chromium` z uprawnieniami administratora. Alternatywnie `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` wskazuje istniejący Chromium. Testy uruchamiają i zatrzymują własny serwer, używają nowego kontekstu przeglądarki i zapisują logi w ignorowanym `e2e/artifacts/`. Pełny backend musi mieć zainstalowane swoje zależności; `E2E_API_PYTHON` jest opcjonalnym wyborem jego interpretera w AutoDesk/BankGuard. Testy nie uruchamiają wdrożenia.
+
+Backendowe testy HTTP wymagają `python -m pip install -r requirements-dev.txt` (zawiera httpx dla TestClient). Sam `requirements.txt` instaluje zależności uruchomieniowe.
+
+## Walidacja etapu 2 — 2026-10-18
+
+Nowe eksporty XLSX/TXT/HTML powstają we własnym katalogu tymczasowym żądania i są usuwane dopiero po wysłaniu odpowiedzi albo po błędzie generowania. Odpowiedź jest załącznikiem z `Cache-Control: private, no-store` i `nosniff`. Historia zachowuje metadane. Istniejące pliki w AUTODESK_GENERATED_DIR nie są przeszukiwane ani usuwane; po twardym zakończeniu procesu ewentualne pozostałości wymagają przeglądu operatora.
+
+53 testy API/usług sprawdzają także kompletny XLSX, oba formaty raportów i zachowanie istniejącego pliku. Rozszerzone E2E testuje czyszczenie CSV, pobrania, sorter nazw, historię/reload/reset własnej bazy oraz axe. Kod nie oferuje generatora PDF. Lokalnie przechodzą lint/typy/build i bramka zależności; pip-audit środowiska backendu ma 0 zgłoszeń. Surowy npm audit uwzględnia poprawione lokalnie braces — [SECURITY_PATCH.md](SECURITY_PATCH.md).
+
+Zakres dostępu: narzędzie jednego zaufanego użytkownika, backend uruchamiany przez `uvicorn app.main:app --host 127.0.0.1`. Brak uwierzytelniania; nie wystawiaj tego API publicznie ani przez udostępniony tunel. Publiczna usługa wymaga osobnego projektu uprawnień i limitów.

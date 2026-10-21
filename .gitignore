@@ -19,3 +19,9 @@ frontend/dist/
 # Środowisko
 .env
 .env*.local
+
+e2e/artifacts/
+e2e/__pycache__/
+.pytest_cache/
+
+.venv-e2e/

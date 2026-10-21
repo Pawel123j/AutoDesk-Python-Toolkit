@@ -1,0 +1,17 @@
+diff --git a/node_modules/braces/lib/parse.js b/node_modules/braces/lib/parse.js
+index 3a6988e..bdc4d99 100644
+--- a/node_modules/braces/lib/parse.js
++++ b/node_modules/braces/lib/parse.js
+@@ -55,6 +55,12 @@ const parse = (input, options = {}) => {
+ 
+   const advance = () => input[index++];
+   const push = node => {
++    // Bound recursive compile/stringify/expand depth for untrusted glob strings.
++    // Both parenthesis and brace nodes contribute to the AST nesting depth.
++    if (node.nodes && stack.length > 128) {
++      throw new SyntaxError('Brace pattern exceeds maximum nesting depth (128)');
++    }
++
+     if (node.type === 'text' && prev.type === 'dot') {
+       prev.type = 'text';
+     }

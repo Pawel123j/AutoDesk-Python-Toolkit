@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from .database import add_history, clear_history, fetch_history, init_db
 from .schemas import (
@@ -27,8 +30,30 @@ from .services import (
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-GENERATED_DIR = BASE_DIR / "generated"
+GENERATED_DIR = Path(os.getenv("AUTODESK_GENERATED_DIR", str(BASE_DIR / "generated")))
 DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
+
+def temporary_download(
+    file_name: str, extension: str, media_type: str, write: Callable[[Path, str], None],
+) -> FileResponse:
+    """Retain only this request's export until its response has been sent.
+
+    Existing files in GENERATED_DIR are never scanned or removed. The owned
+    temporary directory is also cleaned if generation/history fails.
+    """
+    temporary = TemporaryDirectory(prefix="export-", dir=GENERATED_DIR)
+    try:
+        output, download_name = make_generated_path(Path(temporary.name), file_name, extension)
+        write(output, download_name)
+        return FileResponse(
+            path=output, filename=download_name, media_type=media_type,
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+            background=BackgroundTask(temporary.cleanup),
+        )
+    except BaseException:
+        temporary.cleanup()
+        raise
 
 
 @asynccontextmanager
@@ -101,22 +126,23 @@ async def clean_csv_endpoint(file: UploadFile = File(...)) -> CleanCsvResponse:
 @app.post("/api/csv/to-excel", tags=["CSV"])
 async def csv_to_excel_endpoint(file: UploadFile = File(...)) -> FileResponse:
     dataframe, file_name = await read_csv_upload(file)
-    output_path, download_name = make_generated_path(GENERATED_DIR, file_name, ".xlsx")
 
-    try:
-        dataframe.to_excel(output_path, index=False)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not convert CSV to Excel: {exc}") from exc
+    def write(output_path: Path, download_name: str) -> None:
+        try:
+            dataframe.to_excel(output_path, index=False)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500, detail="Could not convert CSV to Excel. Please retry."
+            ) from exc
+        add_history(
+            action_type="CSV to Excel", file_name=file_name,
+            details={
+                "download_name": download_name, "rows": len(dataframe), "columns": len(dataframe.columns),
+            },
+        )
 
-    add_history(
-        action_type="CSV to Excel",
-        file_name=file_name,
-        details={"download_name": download_name, "rows": len(dataframe), "columns": len(dataframe.columns)},
-    )
-    return FileResponse(
-        path=output_path,
-        filename=download_name,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    return temporary_download(
+        file_name, ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", write,
     )
 
 
@@ -127,21 +153,20 @@ async def report_generator_endpoint(
 ) -> FileResponse:
     dataframe, file_name = await read_csv_upload(file)
     extension = ".html" if report_format == "html" else ".txt"
-    output_path, download_name = make_generated_path(GENERATED_DIR, file_name, extension)
 
-    try:
-        report = build_report(dataframe, file_name, report_format)
-        output_path.write_text(report, encoding="utf-8")
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not generate report: {exc}") from exc
+    def write(output_path: Path, download_name: str) -> None:
+        try:
+            report = build_report(dataframe, file_name, report_format)
+            output_path.write_text(report, encoding="utf-8")
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail="Could not generate report. Please retry.") from exc
+        add_history(
+            action_type="Report Generator", file_name=file_name,
+            details={"download_name": download_name, "format": report_format, "rows": len(dataframe)},
+        )
 
-    add_history(
-        action_type="Report Generator",
-        file_name=file_name,
-        details={"download_name": download_name, "format": report_format, "rows": len(dataframe)},
-    )
     media_type = "text/html" if report_format == "html" else "text/plain"
-    return FileResponse(path=output_path, filename=download_name, media_type=media_type)
+    return temporary_download(file_name, extension, media_type, write)
 
 
 @app.post("/api/file-sorter/simulate", response_model=FileSorterResponse, tags=["File Sorter"])

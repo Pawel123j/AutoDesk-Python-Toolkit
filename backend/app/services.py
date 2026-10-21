@@ -25,7 +25,7 @@ async def read_csv_upload(upload: UploadFile) -> tuple[pd.DataFrame, str]:
     if not file_name.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a CSV file.")
 
-    data = await upload.read()
+    data = await upload.read(MAX_UPLOAD_BYTES + 1)
     if not data:
         raise HTTPException(status_code=400, detail="The uploaded CSV file is empty.")
     if len(data) > MAX_UPLOAD_BYTES:
@@ -38,7 +38,7 @@ async def read_csv_upload(upload: UploadFile) -> tuple[pd.DataFrame, str]:
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=400, detail="The CSV encoding is not supported.") from exc
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Could not parse CSV file: {exc}") from exc
+        raise HTTPException(status_code=400, detail="Could not parse CSV file. Check its format.") from exc
 
     return dataframe, file_name
 
@@ -109,7 +109,7 @@ def dataframe_preview(dataframe: pd.DataFrame, limit: int = PREVIEW_LIMIT) -> li
 def to_json_safe(value: Any) -> Any:
     if value is None:
         return None
-    if isinstance(value, float) and math.isnan(value):
+    if isinstance(value, float) and not math.isfinite(value):
         return None
     if hasattr(value, "item"):
         try:

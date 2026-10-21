@@ -25,8 +25,7 @@ jobs:
         # wydaniami i bez tego CI potrafi zapalić się na czerwono przy
         # niezmienionym kodzie.
         run: |
-          pip install -r requirements.txt
-          pip install pytest "ruff==0.16.8"
+          pip install -r requirements-dev.txt
 
       - name: Ruff
         run: ruff check .
@@ -63,7 +62,7 @@ jobs:
         run: npm run typecheck
 
       - name: Audyt zależności
-        run: npm audit --audit-level=high
+        run: npm run security:check
 
       - name: Build
         run: npm run build
