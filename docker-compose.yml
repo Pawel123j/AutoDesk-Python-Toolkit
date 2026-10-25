@@ -8,13 +8,16 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       # Frontend w kontenerze odpytuje backend z przeglądarki użytkownika,
       # czyli spod adresu localhost:5173 — stąd ten wpis w CORS.
       CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      AUTODESK_DATA_DIR: /app/data
     volumes:
-      # Baza SQLite i pliki generowane przeżywają restart kontenera.
+      # Przy aktualizacji istniejącej instalacji najpierw wykonaj backup z README.
+      - toolkit-history:/app/data
+      # Dotychczasowy wolumen eksportów pozostaje pod tą samą ścieżką.
       - toolkit-data:/app/generated
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/', timeout=2).status == 200 else 1)"]
@@ -30,10 +33,11 @@ services:
       args:
         VITE_API_BASE_URL: http://localhost:8000
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     depends_on:
       backend:
         condition: service_healthy
 
 volumes:
   toolkit-data:
+  toolkit-history:

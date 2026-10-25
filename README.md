@@ -66,6 +66,9 @@ AutoDesk-Python-Toolkit/
 
 ## Uruchomienie przez Dockera
 
+Przy aktualizacji istniejącej instalacji najpierw zabezpiecz historię zgodnie
+z instrukcją poniżej. Nowy wolumen nie przejmuje automatycznie bazy ze starego kontenera.
+
 Najszybsza droga — jedna komenda stawia backend i frontend:
 
 ```bash
@@ -74,6 +77,42 @@ docker compose up --build
 
 - Frontend: http://localhost:5173
 - API i dokumentacja: http://localhost:8000/docs
+
+Oba porty są domyślnie dostępne tylko przez `127.0.0.1`. Historia SQLite
+znajduje się w osobnym wolumenie `toolkit-history` pod `/app/data`;
+dotychczasowy `toolkit-data` nadal przechowuje eksporty. Nie używaj
+`docker compose down -v`, jeżeli chcesz zachować dane.
+
+### Zachowanie historii przy aktualizacji starszej instalacji
+
+Przerwij korzystanie z aplikacji na czas migracji. **Przed odtworzeniem starego
+kontenera** wykonaj spójną kopię SQLite do nowego prywatnego katalogu:
+
+```bash
+umask 077
+toolkit_backup_dir=$(mktemp -d)
+docker compose exec -T backend python -c 'import sqlite3,sys; source=sqlite3.connect("file:/app/data/toolkit.db?mode=ro", uri=True); backup=sqlite3.connect(":memory:"); source.backup(backup); sys.stdout.buffer.write(backup.serialize())' > "$toolkit_backup_dir/toolkit.db"
+```
+
+Sprawdź powodzenie komendy i zachowaj katalog kopii. Jeśli backup się nie udał,
+nie odtwarzaj kontenera. Po przygotowaniu nowego obrazu zatrzymaj backend
+i przenieś kopię do **pustego** nowego wolumenu:
+
+```bash
+docker compose build backend
+docker compose stop backend
+docker compose run --rm --no-deps -T backend python -c 'import sqlite3,sys; from pathlib import Path; from tempfile import TemporaryDirectory; import os; data=Path("/app/data"); data.mkdir(parents=True,exist_ok=True); temporary=TemporaryDirectory(dir=data); candidate=Path(temporary.name)/"history.db"; candidate.write_bytes(sys.stdin.buffer.read()); connection=sqlite3.connect(f"file:{candidate}?mode=ro",uri=True); assert connection.execute("PRAGMA integrity_check").fetchall()==[("ok",)]; connection.close(); os.link(candidate,data/"toolkit.db"); temporary.cleanup()' < "$toolkit_backup_dir/toolkit.db"
+```
+
+Import odmawia zastąpienia istniejącego `toolkit.db`. Jeśli plik już istnieje,
+zachowaj obie kopie i sprawdź ich zawartość; nie usuwaj bazy, aby wymusić import.
+Po udanym imporcie uruchom `docker compose up --build` i sprawdź historię.
+Zachowaj backup do zakończenia weryfikacji. Powyższe komendy dotyczą wyłącznie
+Twojej instalacji AutoDesk; nie wymagają zatrzymywania innych projektów.
+
+Eksport XLSX zapisuje tekst CSV i nagłówki jako tekst, również gdy zaczynają
+się od `=`. Nie wykonuje formuł z wejścia; liczby pozostają liczbami.
+Czytniki XML mogą normalizować znak CR do LF w tekstowych komórkach.
 
 Obraz backendu działa **bez roota** i ma healthcheck; frontend jest
 budowany w osobnym etapie, więc do obrazu wynikowego nie trafia ani
@@ -91,7 +130,7 @@ pip install -r requirements.txt pytest ruff
 ruff check .
 pytest                    # 46 testów
 
-# frontend
+# frontend — Node.js 24 (>=24.15, <25)
 cd frontend && npm ci
 npm run lint              # ESLint
 npm run typecheck         # tsc --noEmit
