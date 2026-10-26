@@ -49,6 +49,9 @@ function verifyPatchedBraces(node) {
   assert.ok(braces.compile('{a,b}'.repeat(1000)));
   checked.add(node);
 }
+// Verify the committed patch even if the advisory feed no longer reports it.
+// Otherwise a zero-finding audit could conceal a missing or modified patch.
+verifyPatchedBraces('node_modules/braces');
 const failures = [];
 for (const vulnerability of Object.values(report.vulnerabilities)) {
   for (const advisory of vulnerability.via) {

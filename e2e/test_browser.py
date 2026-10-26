@@ -2,9 +2,9 @@ import os
 import sys
 from pathlib import Path
 
+from accessibility import assert_accessible
 from browser_support import application, browser, static_site
 from playwright.sync_api import expect
-from accessibility import assert_accessible
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -60,7 +60,10 @@ def test_autodesk_csv_history(tmp_path):
             expect(page.get_by_role("cell", name="regression.csv")).to_be_visible()
             assert (tmp_path / "data/toolkit.db").exists()
 
-            fixture = {"name": "exports.csv", "mimeType": "text/csv", "buffer": b"Name,Amount\nAlice,10\nBob,20\n"}
+            fixture = {
+                "name": "exports.csv", "mimeType": "text/csv",
+                "buffer": b"Name,Amount\nAlice,10\nBob,20\n",
+            }
             page.get_by_role("button", name="CSV to Excel", exact=True).click()
             page.locator("#converter-file").set_input_files(fixture)
             with page.expect_download() as download:

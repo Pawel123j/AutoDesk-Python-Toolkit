@@ -17,7 +17,7 @@ COPY backend/app ./app
 
 # Katalog na generowane pliki (XLSX, raporty). Musi istnieć zanim
 # aplikacja spróbuje do niego zapisać.
-RUN mkdir -p /app/generated
+RUN mkdir -p /app/generated /app/data
 
 # Uruchomienie bez roota. Kontener, który przetwarza pliki wrzucane
 # przez użytkownika, nie ma powodu działać z pełnymi uprawnieniami.
