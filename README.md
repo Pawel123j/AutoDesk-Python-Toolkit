@@ -1,245 +1,100 @@
-# AutoDesk Python Toolkit
+# CSV Workbench
 
-AutoDesk Python Toolkit is a local full-stack automation dashboard for beginner and intermediate portfolio work. It combines a FastAPI backend with a React, TypeScript, Tailwind CSS frontend to clean CSV files, convert CSV to Excel, generate simple reports, simulate file sorting, and store action history in SQLite.
+CSV Workbench is a local-first toolkit for cleaning small CSV exports and turning them into useful files. It gives a clear before-and-after preview, creates Excel workbooks and reports, simulates file sorting, and keeps a local history of actions. Uploaded file contents are processed in memory and are not saved.
 
-No paid APIs are required. Everything runs locally.
+## Try the demo
 
-> **Uwaga co do nazwy.** Ten projekt nie ma żadnego związku z firmą
-> **Autodesk, Inc.** (AutoCAD, Maya, Fusion 360). Zbieżność nazw jest
-> przypadkowa i **nazwa powinna zostać zmieniona** — propozycje
-> i uzasadnienie: [docs/NAZWA.md](docs/NAZWA.md).
+The cleaner has a built-in synthetic sample, so the full workflow works without preparing a file:
 
-## Features
+1. Open **CSV Cleaner** and choose **Load sample CSV**.
+2. Choose **Clean CSV** to remove one duplicate and one blank row.
+3. Review the cleaned rows, then try **CSV to Excel** or **Reports**.
+4. Open **History** to see the local action log.
 
-- Homepage with a polished dashboard overview
-- CSV cleaner with upload, empty row removal, duplicate removal, normalized column names, and preview table
-- CSV to Excel converter with downloadable XLSX output
-- Report generator with downloadable TXT or HTML reports
-- File sorter simulation for images, documents, spreadsheets, archives, and other files
-- SQLite history page with date, action type, file name, and details
-- FastAPI automatic documentation at `/docs`
-- Loading states and friendly error messages in the frontend
+The 10 MB file limit and local processing are shown in the interface. The screenshots below come from this working browser flow.
 
-## Tech Stack
+![CSV cleaning result on desktop](docs/screenshots/csv-cleaner-desktop.png)
 
-Backend:
+![CSV cleaning result on a phone viewport](docs/screenshots/csv-cleaner-mobile.png)
 
-- Python
-- FastAPI
-- Pandas
-- SQLite
-- Uvicorn
-- Pydantic
+## Run locally
 
-Frontend:
+Requirements: Python 3.11 or newer and Node.js 20 or newer.
 
-- React
-- TypeScript
-- Tailwind CSS
-- Vite
+In the project root, create a virtual environment and install the backend dependencies:
 
-## Project Structure
-
-```text
-AutoDesk-Python-Toolkit/
-  backend/
-    app/
-      main.py
-      database.py
-      schemas.py
-      services.py
-    data/
-    generated/
-  examples/
-    sample_sales.csv
-  frontend/
-    src/
-      components/
-      lib/
-      App.tsx
-      main.tsx
-    package.json
-  requirements.txt
-  README.md
-  .gitignore
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --app-dir backend --reload
 ```
 
-## Uruchomienie przez Dockera
+On Windows PowerShell, activate with `\.venv\Scripts\Activate.ps1` instead. The API is at `http://127.0.0.1:8000`; its interactive docs are at `/docs`.
 
-Najszybsza droga — jedna komenda stawia backend i frontend:
+In another terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. If the API uses another address, set `VITE_API_BASE_URL` in `frontend/.env` before starting or building the frontend.
+
+## Run with Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-- Frontend: http://localhost:5173
-- API i dokumentacja: http://localhost:8000/docs
+The web and API ports bind to loopback. Compose stores the SQLite history and generated exports in separate named volumes; keep those volumes when recreating containers. The API container runs as an unprivileged user.
 
-Obraz backendu działa **bez roota** i ma healthcheck; frontend jest
-budowany w osobnym etapie, więc do obrazu wynikowego nie trafia ani
-`node_modules`, ani kod źródłowy — sam katalog `dist` serwowany przez nginx.
+## What it demonstrates
 
-Adres backendu wchodzi do bundla frontendu **w czasie budowania** (Vite
-podmienia `import.meta.env.*` na stałe), więc zmiana `VITE_API_BASE_URL`
-wymaga przebudowania obrazu, nie tylko restartu.
+- CSV cleanup with row counts, normalized column names and a data preview
+- CSV-to-XLSX conversion and downloadable text or HTML reports
+- File sorting simulation that does not move files
+- A local SQLite action history
+- FastAPI, Pandas, React, TypeScript and a small set of focused data-processing tests
 
-## Testy, lint i CI
+The app has no user authentication. Keep it on your own machine; do not expose it as a shared service without adding access controls and retention rules.
+
+## Data and storage
+
+By default, SQLite history is stored in `backend/data/toolkit.db` and temporary exports use `backend/generated/`. Set `AUTODESK_DATA_DIR` or `AUTODESK_GENERATED_DIR` before starting the backend to select other folders. Docker Compose maps persistent volumes to `/app/data` and `/app/generated`.
+
+The database stores action metadata (date, operation, file name and summary counts), not the uploaded CSV contents. Downloads are temporary and removed after the response is sent.
+
+## Checks
+
+From the repository root:
 
 ```bash
-# backend
-pip install -r requirements.txt pytest ruff
 ruff check .
-pytest                    # 46 testów
-
-# frontend
-cd frontend && npm ci
-npm run lint              # ESLint
-npm run typecheck         # tsc --noEmit
+python -m pytest -q
+cd frontend
+npm run lint
+npm run typecheck
 npm run build
 ```
 
-CI uruchamia to wszystko na każdej gałęzi, plus buduje oba obrazy Dockera
-**i sprawdza, że backend odpowiada** — obraz, którego nikt nie uruchomił,
-nie jest dowodem na nic.
-
-Wcześniej jedynym sprawdzeniem backendu było `python -m compileall`.
-Sprawdzanie, czy kod daje się sparsować, nie mówi nic o tym, czy robi to,
-co powinien — a to jest aplikacja do przetwarzania danych, w której błąd
-niczego nie wywala, tylko zwraca złe liczby.
-
-### Co pokrywają testy
-
-Testy dotyczą warstwy przetwarzania danych, bo tam błąd jest najdroższy
-i najtrudniejszy do zauważenia:
-
-| Obszar | Przykład tego, co jest sprawdzane |
-|---|---|
-| Normalizacja nazw kolumn | wynik **zawsze unikalny** — dwie kolumny o tej samej nazwie sprawiają, że przy zamianie wiersza na słownik jedna po cichu przesłania drugą |
-| Czyszczenie CSV | usuwany jest wiersz *całkowicie* pusty, nie taki z jedną brakującą wartością; liczby się bilansują; ramka wejściowa nie jest modyfikowana |
-| Podgląd | `NaN` zamieniany na `null` (inaczej frontend nie sparsuje odpowiedzi), wartości jako typy Pythona a nie numpy |
-| Raporty | nazwa pliku i nazwy kolumn **escapowane** w HTML — oba pochodzą od użytkownika |
-| Nazwy plików | `../../etc/passwd` sprowadzane do `passwd`; losowy przyrostek, żeby drugi użytkownik nie nadpisał pliku pierwszego |
-
-Podczas pisania tych testów wyszedł **realny błąd** w normalizacji nazw
-kolumn: dla `["Name", "name_2", "NAME"]` powstawały dwie kolumny `name_2`.
-Licznik wystąpień nazwy bazowej nie sprawdzał, czy wygenerowany przyrostek
-nie koliduje z nazwą, która wystąpiła w pliku dosłownie. Naprawione.
-
-## Backend Setup
-
-From the project root:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn backend.app.main:app --reload
-```
-
-Backend URLs:
-
-- API root: `http://localhost:8000`
-- Interactive API docs: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/api/health`
-
-Optional CORS configuration:
-
-```powershell
-$env:CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
-```
-
-## Frontend Setup
-
-Open a second terminal:
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend URL:
-
-```text
-http://127.0.0.1:5173
-```
-
-If your backend runs on another host or port, create `frontend/.env`:
-
-```text
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-## Try It Quickly
-
-1. Start the backend.
-2. Start the frontend.
-3. Open `http://127.0.0.1:5173`.
-4. Upload `examples/sample_sales.csv` in the CSV Cleaner, Converter, or Report Generator.
-5. Visit the History page to see the saved SQLite log.
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/api/health` | Service health check |
-| `POST` | `/api/csv/clean` | Clean CSV and return preview JSON |
-| `POST` | `/api/csv/to-excel` | Convert CSV to downloadable XLSX |
-| `POST` | `/api/reports/generate?format=txt` | Generate downloadable text report |
-| `POST` | `/api/reports/generate?format=html` | Generate downloadable HTML report |
-| `POST` | `/api/file-sorter/simulate` | Categorize example file names |
-| `GET` | `/api/history` | Read processing history |
-| `DELETE` | `/api/history` | Clear processing history |
-
-## Development Notes
-
-- Uploaded CSV files are processed in memory and capped at 10 MB.
-- Generated downloads are written to `backend/generated/`, which is ignored by Git.
-- SQLite history is stored in `backend/data/toolkit.db`, which is ignored by Git.
-- The backend is split into routes, services, schemas, and database helpers for readability.
-- The frontend uses reusable upload, status, and preview components.
-
-## Production Ideas
-
-- Add authentication for multi-user use
-- Add background cleanup for generated files
-- Add unit tests for CSV processing and sorter categorization
-- Add Docker Compose for one-command startup
-- Add richer report templates and chart exports
-
-## Licencja
-
-MIT — patrz [LICENSE](LICENSE).
-
-## Weryfikacja środowiska — 2026-10-17
-
-Backend zalicza 50 testów; Ruff oraz lint, typy i build frontendu przechodzą. Naprawiono serializację `inf`/`-inf` w podglądzie CSV (JSON `null`), ograniczono odczyt uploadu i usunięto szczegóły wyjątków z odpowiedzi błędów konwersji/raportu.
-
-`AUTODESK_DATA_DIR` wybiera katalog SQLite (`toolkit.db`), a `AUTODESK_GENERATED_DIR` katalog eksportów; domyślne ścieżki pozostają w `backend/`. Ustaw je przed startem procesu. E2E tworzy własne katalogi i sprawdza rzeczywisty upload, deduplikację oraz historię po reload. Zbuduj frontend z `VITE_API_BASE_URL=http://127.0.0.1:18320`; opcjonalnie ustaw `E2E_API_PYTHON` na interpreter backendu. CI: `.github/workflows/browser.yml`.
-
-API nie ma kontroli dostępu: lokalne narzędzie jest gotowe do demonstracji, publiczny serwer wymaga uwierzytelnienia, limitu wielkości żądań na proxy i polityki usuwania eksportów. Audyt npm pozostawia zgłoszenia narzędziowe Tailwind. Przy aktualizacji zachowaj katalog danych i eksportów; rollback przywraca kod oraz backup SQLite z kompatybilnym schematem.
-
-
-### Testy przeglądarkowe
-
-Po zainstalowaniu zależności aplikacji i zbudowaniu frontendu zgodnie z README / workflow `browser.yml` (lub jobem browser w `ci.yml`):
+The backend suite has 54 tests. The browser scenario drives the built app through sample cleaning, history, XLSX and report downloads, file sorting, accessibility checks and history clearing. To reproduce it, build with the API address used by the test and install the E2E requirements:
 
 ```bash
-python -m venv .venv-e2e
-# Aktywuj ten venv przed dalszymi poleceniami.
+cd frontend
+VITE_API_BASE_URL=http://127.0.0.1:18320 npm run build
+cd ..
 python -m pip install -r e2e/requirements.txt
-python -m playwright install chromium
-python -m pytest -q e2e
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium E2E_API_PYTHON="$(pwd)/.venv/bin/python" .venv/bin/python -m pytest -q e2e
 ```
 
-Na Linux może być potrzebne `python -m playwright install --with-deps chromium` z uprawnieniami administratora. Alternatywnie `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` wskazuje istniejący Chromium. Testy uruchamiają i zatrzymują własny serwer, używają nowego kontekstu przeglądarki i zapisują logi w ignorowanym `e2e/artifacts/`. Pełny backend musi mieć zainstalowane swoje zależności; `E2E_API_PYTHON` jest opcjonalnym wyborem jego interpretera w AutoDesk/BankGuard. Testy nie uruchamiają wdrożenia.
+The E2E run uses temporary database and export folders and writes fresh browser screenshots to `docs/screenshots/`.
 
-Backendowe testy HTTP wymagają `python -m pip install -r requirements-dev.txt` (zawiera httpx dla TestClient). Sam `requirements.txt` instaluje zależności uruchomieniowe.
+## Naming
 
-## Walidacja etapu 2 — 2026-10-18
+The original repository name suggests a connection to Autodesk, Inc.; there is none. The product and API are now named CSV Workbench. See [the naming note](docs/NAZWA.md).
 
-Nowe eksporty XLSX/TXT/HTML powstają we własnym katalogu tymczasowym żądania i są usuwane dopiero po wysłaniu odpowiedzi albo po błędzie generowania. Odpowiedź jest załącznikiem z `Cache-Control: private, no-store` i `nosniff`. Historia zachowuje metadane. Istniejące pliki w AUTODESK_GENERATED_DIR nie są przeszukiwane ani usuwane; po twardym zakończeniu procesu ewentualne pozostałości wymagają przeglądu operatora.
+## License
 
-53 testy API/usług sprawdzają także kompletny XLSX, oba formaty raportów i zachowanie istniejącego pliku. Rozszerzone E2E testuje czyszczenie CSV, pobrania, sorter nazw, historię/reload/reset własnej bazy oraz axe. Kod nie oferuje generatora PDF. Lokalnie przechodzą lint/typy/build i bramka zależności; pip-audit środowiska backendu ma 0 zgłoszeń. Surowy npm audit uwzględnia poprawione lokalnie braces — [SECURITY_PATCH.md](SECURITY_PATCH.md).
-
-Zakres dostępu: narzędzie jednego zaufanego użytkownika, backend uruchamiany przez `uvicorn app.main:app --host 127.0.0.1`. Brak uwierzytelniania; nie wystawiaj tego API publicznie ani przez udostępniony tunel. Publiczna usługa wymaga osobnego projektu uprawnień i limitów.
+MIT. See [LICENSE](LICENSE).

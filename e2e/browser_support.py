@@ -72,7 +72,6 @@ def browser():
         instance = p.chromium.launch(
             executable_path=os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"),
             headless=True,
-            args=["--no-sandbox"],
         )
         try:
             yield instance

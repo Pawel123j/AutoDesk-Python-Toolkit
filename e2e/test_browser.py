@@ -2,9 +2,9 @@ import os
 import sys
 from pathlib import Path
 
+from accessibility import assert_accessible
 from browser_support import application, browser, static_site
 from playwright.sync_api import expect
-from accessibility import assert_accessible
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -41,26 +41,32 @@ def test_autodesk_csv_history(tmp_path):
             page.goto(url)
             assert_accessible(page, REPO, "home")
             page.get_by_role("button", name="CSV Cleaner", exact=True).click()
-            page.locator("#cleaner-file").set_input_files(
-                {
-                    "name": "regression.csv",
-                    "mimeType": "text/csv",
-                    "buffer": b"Name,Amount\nAlice,10\nAlice,10\nBob,20\n",
-                }
-            )
+            page.get_by_role("button", name="Load sample CSV", exact=True).click()
             page.get_by_role("button", name="Clean CSV", exact=True).click()
             expect(page.get_by_text("Duplicates removed", exact=True).locator("..")).to_contain_text("1")
             expect(page.get_by_text("Cleaned rows", exact=True).locator("..")).to_contain_text("2")
+            page.screenshot(
+                path=str(REPO / "docs" / "screenshots" / "csv-cleaner-mobile.png"),
+                full_page=True,
+            )
+            page.set_viewport_size({"width": 1280, "height": 900})
+            page.screenshot(
+                path=str(REPO / "docs" / "screenshots" / "csv-cleaner-desktop.png"),
+                full_page=True,
+            )
             assert_accessible(page, REPO, "current-tool")
             page.get_by_role("button", name="History", exact=True).click()
-            expect(page.get_by_role("cell", name="regression.csv")).to_be_visible()
+            expect(page.get_by_role("cell", name="sample-sales.csv")).to_be_visible()
             page.reload()
             assert_accessible(page, REPO, "current-tool")
             page.get_by_role("button", name="History", exact=True).click()
-            expect(page.get_by_role("cell", name="regression.csv")).to_be_visible()
+            expect(page.get_by_role("cell", name="sample-sales.csv")).to_be_visible()
             assert (tmp_path / "data/toolkit.db").exists()
 
-            fixture = {"name": "exports.csv", "mimeType": "text/csv", "buffer": b"Name,Amount\nAlice,10\nBob,20\n"}
+            fixture = {
+                "name": "exports.csv", "mimeType": "text/csv",
+                "buffer": b"Name,Amount\nAlice,10\nBob,20\n",
+            }
             page.get_by_role("button", name="CSV to Excel", exact=True).click()
             page.locator("#converter-file").set_input_files(fixture)
             with page.expect_download() as download:
