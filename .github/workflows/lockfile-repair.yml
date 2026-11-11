@@ -18,7 +18,7 @@ jobs:
         run: |
           cd frontend
           npm ci
-          npm audit fix --package-lock-only
+          npm audit fix --force --package-lock-only
           npm ci
           npm run security:check
           npm run lint
