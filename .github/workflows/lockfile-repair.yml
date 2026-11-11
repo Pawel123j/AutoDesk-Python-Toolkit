@@ -1,0 +1,29 @@
+name: Temporary lockfile repair verification
+on:
+  push:
+    branches: ["codex/portfolio-polish-2026-11-02"]
+    paths: [".github/workflows/lockfile-repair.yml"]
+permissions:
+  contents: read
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Resolve advisories without forced major upgrades and verify
+        run: |
+          cd frontend
+          npm ci
+          npm audit fix --package-lock-only
+          npm ci
+          npm run security:check
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Export verified lockfile
+        run: |
+          node -e "const fs=require('fs');const b=fs.readFileSync('frontend/package-lock.json').toString('base64');for(let i=0;i<b.length;i+=6000)console.log('LOCKFILE_CHUNK_'+i+':'+b.slice(i,i+6000));console.log('LOCKFILE_DONE')"
