@@ -37,7 +37,9 @@ def migrate_history(source: Path, destination: Path) -> int:
             if not {"id", "created_at", "action_type", "file_name", "details"} <= columns:
                 raise ValueError("Source database does not contain a supported history table")
             count = copy.execute("SELECT COUNT(*) FROM history").fetchone()[0]
-        with temporary.open("rb") as handle:
+        # Windows' _commit (used by fsync) needs a writable descriptor.
+        # r+b preserves the already validated snapshot without truncating it.
+        with temporary.open("r+b") as handle:
             os.fsync(handle.fileno())
         os.link(temporary, destination)
         if os.name == "posix":

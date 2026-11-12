@@ -64,6 +64,16 @@ def test_processing_failure_does_not_expose_server_details(client, monkeypatch, 
     assert list(main.GENERATED_DIR.iterdir()) == []
 
 
+def test_excel_invalid_xml_text_cleans_partial_export_without_history(client):
+    response = client.post(
+        "/api/csv/to-excel", files={"file": ("invalid.csv", b"name\nprivate\x01value\n")}
+    )
+    assert response.status_code == 500
+    assert "private" not in response.text
+    assert client.get("/api/history").json()["items"] == []
+    assert list(main.GENERATED_DIR.iterdir()) == []
+
+
 @pytest.mark.parametrize("endpoint,prefix", [
     ("/api/csv/to-excel", b"PK"),
     ("/api/reports/generate?format=html", b"<!DOCTYPE"),

@@ -27,7 +27,11 @@ def write_excel_values(dataframe: pd.DataFrame, output_path: Path) -> None:
     inserting an apostrophe. Numeric cells keep their numeric type. XML readers
     normalize carriage returns to line feeds in openpyxl's string output.
     """
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+    # Own the file handle: pandas may fail while saving/closing the workbook,
+    # but Windows must still release the export before request cleanup runs.
+    with output_path.open("wb") as output, pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # Keep close() valid even if conversion fails before creating a sheet.
+        writer.book.create_sheet("Sheet1")
         dataframe.to_excel(writer, index=False)
         for row in writer.sheets["Sheet1"].iter_rows():
             for cell in row:
