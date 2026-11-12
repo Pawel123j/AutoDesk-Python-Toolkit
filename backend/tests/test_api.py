@@ -1,7 +1,11 @@
+import csv
+from io import BytesIO, StringIO
+
 import pandas as pd
 import pytest
 from app import database, main
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 
 @pytest.fixture
@@ -17,6 +21,29 @@ def test_non_finite_csv_values_produce_valid_json(client):
     response = client.post("/api/csv/clean", files={"file": ("values.csv", b"amount\ninf\n-inf\n2\n")})
     assert response.status_code == 200
     assert response.json()["preview"] == [{"amount": None}, {"amount": None}, {"amount": 2.0}]
+
+
+@pytest.mark.parametrize("text", [
+    "=1+1", "+1+1", "-1+1", "@SUM(1)", " =1+1", "\t=1+1", "\r=1+1", "Zażółć gęślą",
+])
+def test_excel_preserves_untrusted_cells_and_headers_as_text(client, text):
+    source = StringIO(newline="")
+    writer = csv.writer(source)
+    writer.writerow([text, "amount"])
+    writer.writerow([text, -12.5])
+    response = client.post("/api/csv/to-excel", files={"file": ("values.csv", source.getvalue().encode())})
+    assert response.status_code == 200
+    workbook = load_workbook(BytesIO(response.content), data_only=False)
+    sheet = workbook.active
+    for address in ["A1", "A2"]:
+        # XML readers normalize literal CR to LF in openpyxl's XML output.
+        assert sheet[address].value == text.replace("\r", "\n")
+        assert sheet[address].data_type == "s"
+    assert sheet["B2"].value == -12.5
+    assert sheet["B2"].data_type == "n"
+    workbook.close()
+    assert len(client.get("/api/history").json()["items"]) == 1
+    assert list(main.GENERATED_DIR.iterdir()) == []
 
 
 @pytest.mark.parametrize("endpoint,target", [

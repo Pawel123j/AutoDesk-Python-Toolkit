@@ -27,6 +27,7 @@ from .services import (
     clean_csv,
     make_generated_path,
     read_csv_upload,
+    write_excel_values,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -129,7 +130,7 @@ async def csv_to_excel_endpoint(file: UploadFile = File(...)) -> FileResponse:
 
     def write(output_path: Path, download_name: str) -> None:
         try:
-            dataframe.to_excel(output_path, index=False)
+            write_excel_values(dataframe, output_path)
         except Exception as exc:
             raise HTTPException(
                 status_code=500, detail="Could not convert CSV to Excel. Please retry."

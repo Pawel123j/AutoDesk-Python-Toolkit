@@ -19,7 +19,7 @@ The 10 MB file limit and local processing are shown in the interface. The screen
 
 ## Run locally
 
-Requirements: Python 3.11 or newer and Node.js 20 or newer.
+Requirements: Python 3.11 or newer and Node.js 24 (the version used by CI and Docker).
 
 In the project root, create a virtual environment and install the backend dependencies:
 
@@ -66,6 +66,46 @@ By default, SQLite history is stored in `backend/data/toolkit.db` and temporary 
 
 The database stores action metadata (date, operation, file name and summary counts), not the uploaded CSV contents. Downloads are temporary and removed after the response is sent.
 
+### Upgrade an existing Docker installation safely
+
+Older Compose versions persisted exports only: the history database lived inside
+the backend container. **Do not recreate or remove that container before copying
+its data.** Keep the same Compose project name so the existing export volume is
+retained. The new `toolkit-history` volume is separate from `toolkit-data`.
+
+Stop writes, copy the entire SQLite directory (including any WAL files), then
+create a verified snapshot. Run these commands from the repository root with the
+old container still present; `docker compose cp` also works on a stopped container:
+
+```bash
+docker compose stop backend
+mkdir -p backups/legacy
+docker compose cp backend:/app/data/. backups/legacy/
+python backend/app/migrate_history.py backups/legacy/toolkit.db backups/toolkit.db
+```
+
+The migration prints the copied row count, checks SQLite integrity and the history
+schema, and refuses to replace an existing target. Keep both copies until you
+have verified the History page after restart. If the old deployment used a custom
+`AUTODESK_DATA_DIR`, copy that directory instead of `/app/data`.
+
+Build the updated image and initialize the new history volume from the snapshot:
+
+```bash
+docker compose build backend
+docker compose run --rm --no-deps --user root -v "$PWD/backups:/backup:ro" backend sh -c 'python -m app.migrate_history /backup/toolkit.db /app/data/toolkit.db && chown 10001:10001 /app/data/toolkit.db'
+docker compose up -d --build
+```
+
+If the destination already exists, migration stops without modifying it. Inspect
+and back up that installation before deciding which history to retain; do not
+delete it to bypass the check. Recreate the backend once more and verify the same
+history rows remain. Never use `docker compose down -v` when retaining data.
+For rollback, keep the verified snapshot and use the same migration command to
+restore it into an **empty** data directory used by the previous code. The current
+history schema is unchanged. Local installations can use the Python command with
+their old and new database paths while the application is stopped.
+
 ## Checks
 
 From the repository root:
@@ -76,10 +116,11 @@ python -m pytest -q
 cd frontend
 npm run lint
 npm run typecheck
+npm run security:check
 npm run build
 ```
 
-The backend suite has 54 tests. The browser scenario drives the built app through sample cleaning, history, XLSX and report downloads, file sorting, accessibility checks and history clearing. To reproduce it, build with the API address used by the test and install the E2E requirements:
+The backend suite covers literal XLSX cells and headers, recovery from a validated SQLite snapshot, WAL data, restart persistence, and failures that must preserve existing data. The browser scenario drives the built app through sample cleaning, history, XLSX and report downloads, file sorting, accessibility checks and history clearing. To reproduce it, build with the API address used by the test and install the E2E requirements:
 
 ```bash
 cd frontend
@@ -89,7 +130,7 @@ python -m pip install -r e2e/requirements.txt
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium E2E_API_PYTHON="$(pwd)/.venv/bin/python" .venv/bin/python -m pytest -q e2e
 ```
 
-The E2E run uses temporary database and export folders and writes fresh browser screenshots to `docs/screenshots/`.
+The E2E run uses temporary database and export folders and writes fresh browser screenshots to `docs/screenshots/`. Chromium's sandbox stays enabled. CI uses the Ubuntu runner's system Chrome, whose path is supported by the runner's AppArmor policy. When local container isolation prevents the browser sandbox from starting, use a host with a working Chromium sandbox rather than disabling it.
 
 ## Naming
 
