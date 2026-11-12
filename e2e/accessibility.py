@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+
 
 def assert_accessible(page, repo, name):
     page.add_script_tag(path=str(repo / 'frontend/node_modules/axe-core/axe.min.js'))

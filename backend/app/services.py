@@ -20,6 +20,25 @@ SPREADSHEET_EXTENSIONS = {".csv", ".xls", ".xlsx", ".ods", ".tsv"}
 ARCHIVE_EXTENSIONS = {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2"}
 
 
+def write_excel_values(dataframe: pd.DataFrame, output_path: Path) -> None:
+    """Export CSV content as values, never as executable spreadsheet formulas.
+
+    Explicit string cells keep expressions literal (including headers) without
+    inserting an apostrophe. Numeric cells keep their numeric type. XML readers
+    normalize carriage returns to line feeds in openpyxl's string output.
+    """
+    # Own the file handle: pandas may fail while saving/closing the workbook,
+    # but Windows must still release the export before request cleanup runs.
+    with output_path.open("wb") as output, pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # Keep close() valid even if conversion fails before creating a sheet.
+        writer.book.create_sheet("Sheet1")
+        dataframe.to_excel(writer, index=False)
+        for row in writer.sheets["Sheet1"].iter_rows():
+            for cell in row:
+                if isinstance(cell.value, str):
+                    cell.data_type = "s"
+
+
 async def read_csv_upload(upload: UploadFile) -> tuple[pd.DataFrame, str]:
     file_name = sanitize_original_filename(upload.filename)
     if not file_name.lower().endswith(".csv"):

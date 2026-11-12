@@ -1,44 +1,8 @@
-# Zrzuty ekranu
+# Browser screenshots
 
-Ten katalog jest pusty celowo.
+These screenshots were captured from the running React app against its FastAPI backend with a synthetic CSV sample.
 
-Zrzuty wymagają uruchomionej aplikacji z interfejsem — środowisko, w którym
-przygotowywano to repozytorium, nie ma przeglądarki ani demona Dockera.
-Wizualizacja zamiast prawdziwego zrzutu byłaby gorsza niż brak obrazka.
+- [Desktop CSV cleaning result](csv-cleaner-desktop.png)
+- [Phone-sized CSV cleaning result](csv-cleaner-mobile.png)
 
-## Jak je zrobić
-
-Najprościej przez Dockera — jedna komenda stawia backend i frontend:
-
-```bash
-docker compose up --build
-```
-
-Frontend: http://localhost:5173, dokumentacja API: http://localhost:8000/docs
-
-Albo bez Dockera, w dwóch terminalach:
-
-```bash
-# terminal 1
-pip install -r requirements.txt
-uvicorn app.main:app --reload --app-dir backend
-
-# terminal 2
-cd frontend && npm install && npm run dev
-```
-
-## Co warto pokazać
-
-| Plik | Widok |
-|---|---|
-| `dashboard.png` | strona główna z kafelkami narzędzi |
-| `csv-cleaner.png` | wynik czyszczenia CSV: liczby usuniętych wierszy i podgląd |
-| `excel-export.png` | konwersja CSV na XLSX |
-| `report.png` | wygenerowany raport HTML |
-| `file-sorter.png` | symulacja sortowania plików wg kategorii |
-| `history.png` | historia operacji z SQLite |
-| `api-docs.png` | automatyczna dokumentacja FastAPI pod `/docs` |
-
-Dobry plik testowy do zrzutów: taki z duplikatami, pustymi wierszami
-i kolumnami o nazwach `First Name`, `E-mail Address` — widać wtedy,
-co narzędzie faktycznie robi.
+To refresh them, follow the browser-test command in the project [README](../../README.md). The test writes to this directory after checking the real API result.
