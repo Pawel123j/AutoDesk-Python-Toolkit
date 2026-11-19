@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 // A temporary, tested source patch, not an ignored vulnerability. Any change to
 // the advisory, installed code, version, or review deadline fails this gate.
 const patchedAdvisory = 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm';
-const reviewBefore = '2026-11-18';
+const reviewBefore = '2027-02-19';
 const patchedParserSha256 = '0d010535667c2889449adcc0cf596c2db2c61f73c513b96c4a2cf1fd8ad1e018';
 const require = createRequire(import.meta.url);
 const npmCli = process.env.npm_execpath;

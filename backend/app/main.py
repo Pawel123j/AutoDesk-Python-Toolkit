@@ -9,7 +9,8 @@ from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
 
 from .database import add_history, clear_history, fetch_history, init_db
@@ -26,12 +27,19 @@ from .services import (
     categorize_file_names,
     clean_csv,
     make_generated_path,
+    neutralize_formulas,
     read_csv_upload,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 GENERATED_DIR = Path(os.getenv("AUTODESK_GENERATED_DIR", str(BASE_DIR / "generated")))
 DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+# Usługa jest lokalnym narzędziem bez kont użytkowników (AD-01). Nagłówek Host ograniczamy do
+# nazw lokalnych (ochrona przed DNS rebinding), a żądania zmieniające stan z obcej strony
+# (nagłówek Origin spoza listy CORS) odrzucamy — CORS blokuje tylko ODCZYT odpowiedzi,
+# nie samo wysłanie formularza multipart przez złośliwą stronę.
+DEFAULT_ALLOWED_HOSTS = "localhost,127.0.0.1,[::1]"
+UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def temporary_download(
@@ -76,6 +84,22 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("AUTODESK_ALLOWED_HOSTS", DEFAULT_ALLOWED_HOSTS).split(",")
+    if host.strip()
+]
+
+
+@app.middleware("http")
+async def reject_cross_site_writes(request, call_next):
+    origin = request.headers.get("origin")
+    if request.method in UNSAFE_METHODS and origin is not None and origin not in ALLOWED_ORIGINS:
+        return JSONResponse(status_code=403, content={"detail": "Cross-site request rejected."})
+    return await call_next(request)
+
+
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -129,7 +153,7 @@ async def csv_to_excel_endpoint(file: UploadFile = File(...)) -> FileResponse:
 
     def write(output_path: Path, download_name: str) -> None:
         try:
-            dataframe.to_excel(output_path, index=False)
+            neutralize_formulas(dataframe).to_excel(output_path, index=False)
         except Exception as exc:
             raise HTTPException(
                 status_code=500, detail="Could not convert CSV to Excel. Please retry."
