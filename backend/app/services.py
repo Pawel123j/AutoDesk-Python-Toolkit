@@ -43,6 +43,32 @@ async def read_csv_upload(upload: UploadFile) -> tuple[pd.DataFrame, str]:
     return dataframe, file_name
 
 
+# Znaki, od których arkusz kalkulacyjny zaczyna interpretować komórkę jako formułę
+# (CSV/Formula Injection, OWASP). Dotyczy tekstu — liczby zostają liczbami.
+FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _neutralize_cell(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith(FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
+def neutralize_formulas(dataframe: pd.DataFrame) -> pd.DataFrame:
+    """Zwraca kopię, w której tekst wyglądający jak formuła jest poprzedzony apostrofem.
+
+    Bez tego plik CSV z komórką `=HYPERLINK(...)` albo `=cmd|...` po eksporcie do XLSX
+    zostałby wykonany jako formuła u osoby, która otworzy wynik w Excelu (AD-02).
+    Nagłówki kolumn są neutralizowane tak samo.
+    """
+    safe = dataframe.copy()
+    safe.columns = [_neutralize_cell(str(column)) for column in safe.columns]
+    for column in safe.columns:
+        if safe[column].dtype == object:
+            safe[column] = safe[column].map(_neutralize_cell)
+    return safe
+
+
 def clean_csv(dataframe: pd.DataFrame) -> dict[str, Any]:
     original_rows = len(dataframe)
     without_empty_rows = dataframe.dropna(how="all")

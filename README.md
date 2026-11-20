@@ -243,3 +243,14 @@ Nowe eksporty XLSX/TXT/HTML powstają we własnym katalogu tymczasowym żądania
 53 testy API/usług sprawdzają także kompletny XLSX, oba formaty raportów i zachowanie istniejącego pliku. Rozszerzone E2E testuje czyszczenie CSV, pobrania, sorter nazw, historię/reload/reset własnej bazy oraz axe. Kod nie oferuje generatora PDF. Lokalnie przechodzą lint/typy/build i bramka zależności; pip-audit środowiska backendu ma 0 zgłoszeń. Surowy npm audit uwzględnia poprawione lokalnie braces — [SECURITY_PATCH.md](SECURITY_PATCH.md).
 
 Zakres dostępu: narzędzie jednego zaufanego użytkownika, backend uruchamiany przez `uvicorn app.main:app --host 127.0.0.1`. Brak uwierzytelniania; nie wystawiaj tego API publicznie ani przez udostępniony tunel. Publiczna usługa wymaga osobnego projektu uprawnień i limitów.
+
+## Bezpieczeństwo uruchomienia lokalnego
+
+Narzędzie nie ma kont użytkowników — jest przeznaczone do uruchamiania lokalnie.
+
+- `docker compose` publikuje backend i frontend wyłącznie na `127.0.0.1`.
+- API przyjmuje tylko nagłówek `Host` z listy `AUTODESK_ALLOWED_HOSTS` (domyślnie `localhost,127.0.0.1,[::1]`) — ochrona przed DNS rebinding.
+- Żądania zmieniające stan (`POST`/`DELETE`) z nagłówkiem `Origin` spoza `CORS_ORIGINS` są odrzucane (403), więc obca strona otwarta w przeglądarce nie może wysłać plików ani wyczyścić historii.
+- Eksport do Excela neutralizuje tekst zaczynający się od `=`, `+`, `-`, `@` (CSV/Formula Injection).
+
+Udostępnienie narzędzia w sieci wymaga reverse proxy z uwierzytelnianiem — API samo w sobie go nie zapewnia.
