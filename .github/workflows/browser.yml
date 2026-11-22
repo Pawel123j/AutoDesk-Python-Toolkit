@@ -33,6 +33,10 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt -r e2e/requirements.txt
       - run: python -m playwright install --with-deps chromium
+      # Ubuntu runners restrict unprivileged user namespaces through AppArmor,
+      # which the Chromium sandbox needs; allow them instead of --no-sandbox.
+      - name: Allow Chromium sandbox (user namespaces)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: python -m pytest -q e2e
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
