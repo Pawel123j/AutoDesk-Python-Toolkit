@@ -29,6 +29,7 @@ from .services import (
     make_generated_path,
     neutralize_formulas,
     read_csv_upload,
+    write_excel_values,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -72,7 +73,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="AutoDesk Python Toolkit API",
+    title="CSV Workbench API",
     version="1.0.0",
     description="FastAPI backend for CSV cleaning, conversion, reporting, file sorting, and history logging.",
     lifespan=lifespan,
@@ -112,13 +113,13 @@ app.add_middleware(
 @app.get("/", response_model=MessageResponse, tags=["System"])
 def root() -> MessageResponse:
     return MessageResponse(
-        message="AutoDesk Python Toolkit API is running. Open /docs for interactive API docs."
+        message="CSV Workbench API is running. Open /docs for interactive API docs."
     )
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["System"])
 def health_check() -> HealthResponse:
-    return HealthResponse(status="ok", service="AutoDesk Python Toolkit API", docs_url="/docs")
+    return HealthResponse(status="ok", service="CSV Workbench API", docs_url="/docs")
 
 
 @app.post("/api/csv/clean", response_model=CleanCsvResponse, tags=["CSV"])
@@ -153,7 +154,9 @@ async def csv_to_excel_endpoint(file: UploadFile = File(...)) -> FileResponse:
 
     def write(output_path: Path, download_name: str) -> None:
         try:
-            neutralize_formulas(dataframe).to_excel(output_path, index=False)
+            # AD-02: neutralize formula-like text (OWASP CSV injection guidance)
+            # and store every text cell as a string so nothing is evaluated.
+            write_excel_values(neutralize_formulas(dataframe), output_path)
         except Exception as exc:
             raise HTTPException(
                 status_code=500, detail="Could not convert CSV to Excel. Please retry."

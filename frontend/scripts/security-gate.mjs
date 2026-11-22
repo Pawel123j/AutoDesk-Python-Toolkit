@@ -49,15 +49,18 @@ function verifyPatchedBraces(node) {
   assert.ok(braces.compile('{a,b}'.repeat(1000)));
   checked.add(node);
 }
+// Verify the committed patch even if the advisory feed no longer reports it.
+// Otherwise a zero-finding audit could conceal a missing or modified patch.
+verifyPatchedBraces('node_modules/braces');
 const failures = [];
 for (const vulnerability of Object.values(report.vulnerabilities)) {
   for (const advisory of vulnerability.via) {
-    if (typeof advisory !== 'object' || !['high', 'critical'].includes(advisory.severity)) continue;
+    if (typeof advisory !== 'object') continue;
     if (advisory.url === patchedAdvisory && vulnerability.name === 'braces' && vulnerability.nodes.length) {
       for (const node of vulnerability.nodes) verifyPatchedBraces(node);
     } else failures.push(`${advisory.severity}: ${advisory.name}: ${advisory.url}`);
   }
 }
 if (failures.length) throw new Error('Unmitigated audit findings:\n' + [...new Set(failures)].join('\n'));
-console.log(`Security gate PASS: ${checked.size} braces installation(s) verified and attack regressions passed; no other high/critical advisories.`);
+console.log(`Security gate PASS: ${checked.size} braces installation(s) verified and attack regressions passed; no other advisories.`);
 console.log('Raw npm audit counts (include patched dependencies):', report.metadata?.vulnerabilities);
