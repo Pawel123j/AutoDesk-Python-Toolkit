@@ -25,3 +25,4 @@ e2e/__pycache__/
 .pytest_cache/
 
 .venv-e2e/
+backups/

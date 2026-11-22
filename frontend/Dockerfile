@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # ── Etap budowania ──────────────────────────────────────────────────────
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 
 WORKDIR /app
 
 COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/patches ./patches
 RUN npm ci
 
 COPY frontend/ ./
